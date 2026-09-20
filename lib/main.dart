@@ -1,6 +1,12 @@
 import 'package:flutter/material.dart';
 
-void main() {
+import 'core/services/revenuecat_service.dart';
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await RevenueCatService.initialize();
+
   runApp(const MyApp());
 }
 

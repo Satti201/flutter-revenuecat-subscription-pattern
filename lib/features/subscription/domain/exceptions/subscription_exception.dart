@@ -29,3 +29,15 @@ class PurchaseFailedException extends SubscriptionException {
 class RestoreFailedException extends SubscriptionException {
   const RestoreFailedException([super.message = 'Restore purchases failed.']);
 }
+
+class SubscriptionLoadFailedException extends SubscriptionException {
+  const SubscriptionLoadFailedException([
+    super.message = 'Unable to load subscription status.',
+  ]);
+}
+
+class PlansLoadFailedException extends SubscriptionException {
+  const PlansLoadFailedException([
+    super.message = 'Unable to load subscription plans.',
+  ]);
+}

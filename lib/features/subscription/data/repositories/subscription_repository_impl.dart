@@ -15,44 +15,60 @@ class SubscriptionRepositoryImpl implements SubscriptionRepository {
 
   @override
   Future<SubscriptionEntity> getCurrentSubscription() async {
-    final customerInfo = await remoteDataSource.getCustomerInfo();
-    return SubscriptionMapper.toSubscriptionEntity(customerInfo);
+    try {
+      final customerInfo = await remoteDataSource.getCustomerInfo();
+      return SubscriptionMapper.toSubscriptionEntity(customerInfo);
+    } on PlatformException catch (e) {
+      throw SubscriptionLoadFailedException(
+        e.message ?? 'Unable to load subscription status.',
+      );
+    }
   }
 
   @override
   Future<List<SubscriptionPlanEntity>> getAvailablePlans() async {
-    final offerings = await remoteDataSource.getOfferings();
-    final offering = offerings.current ?? offerings.all['default'];
+    try {
+      final offerings = await remoteDataSource.getOfferings();
+      final offering = offerings.current ?? offerings.all['default'];
 
-    if (offering == null) {
-      throw const OfferingNotFoundException();
+      if (offering == null) {
+        throw const OfferingNotFoundException();
+      }
+
+      return offering.availablePackages
+          .map(SubscriptionMapper.toSubscriptionPlanEntity)
+          .toList();
+    } on OfferingNotFoundException {
+      rethrow;
+    } on PlatformException catch (e) {
+      throw PlansLoadFailedException(
+        e.message ?? 'Unable to load subscription plans.',
+      );
     }
-
-    return offering.availablePackages
-        .map(SubscriptionMapper.toSubscriptionPlanEntity)
-        .toList();
   }
 
   @override
   Future<SubscriptionEntity> purchasePlan(String planId) async {
-    final offerings = await remoteDataSource.getOfferings();
-    final offering = offerings.current ?? offerings.all['default'];
-
-    if (offering == null) {
-      throw const OfferingNotFoundException();
-    }
-
-    final package = offering.availablePackages
-        .where((p) => p.identifier == planId)
-        .firstOrNull;
-
-    if (package == null) {
-      throw PlanNotFoundException(planId);
-    }
-
     try {
+      final offerings = await remoteDataSource.getOfferings();
+      final offering = offerings.current ?? offerings.all['default'];
+
+      if (offering == null) {
+        throw const OfferingNotFoundException();
+      }
+
+      final package = offering.availablePackages
+          .where((p) => p.identifier == planId)
+          .firstOrNull;
+
+      if (package == null) {
+        throw PlanNotFoundException(planId);
+      }
+
       final customerInfo = await remoteDataSource.purchasePackage(package);
       return SubscriptionMapper.toSubscriptionEntity(customerInfo);
+    } on SubscriptionException {
+      rethrow;
     } on PlatformException catch (e) {
       final errorCode = PurchasesErrorHelper.getErrorCode(e);
 

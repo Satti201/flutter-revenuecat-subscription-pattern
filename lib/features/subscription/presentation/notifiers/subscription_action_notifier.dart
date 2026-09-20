@@ -30,19 +30,17 @@ class SubscriptionActionNotifier
           .read(subscriptionNotifierProvider.notifier)
           .setSubscription(subscription);
 
-      state = state.copyWith(
-        isPurchasing: false,
-        clearError: true,
-      );
-
       return true;
     } on SubscriptionException catch (e) {
       state = state.copyWith(
-        isPurchasing: false,
         errorMessage: e.message,
       );
 
       return false;
+    } finally {
+      state = state.copyWith(
+        isPurchasing: false,
+      );
     }
   }
 
@@ -65,19 +63,17 @@ class SubscriptionActionNotifier
           .read(subscriptionNotifierProvider.notifier)
           .setSubscription(subscription);
 
-      state = state.copyWith(
-        isRestoring: false,
-        clearError: true,
-      );
-
       return true;
     } on SubscriptionException catch (e) {
       state = state.copyWith(
-        isRestoring: false,
         errorMessage: e.message,
       );
 
       return false;
+    } finally {
+      state = state.copyWith(
+        isRestoring: false,
+      );
     }
   }
 

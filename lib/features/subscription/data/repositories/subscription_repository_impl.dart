@@ -1,5 +1,9 @@
+import 'package:flutter/services.dart';
+import 'package:purchases_flutter/purchases_flutter.dart';
+
 import '../../domain/entities/subscription_entity.dart';
 import '../../domain/entities/subscription_plan_entity.dart';
+import '../../domain/exceptions/subscription_exception.dart';
 import '../../domain/repositories/subscription_repository.dart';
 import '../datasources/subscription_remote_datasource.dart';
 import '../mappers/subscription_mapper.dart';
@@ -21,7 +25,7 @@ class SubscriptionRepositoryImpl implements SubscriptionRepository {
     final offering = offerings.current ?? offerings.all['default'];
 
     if (offering == null) {
-      return [];
+      throw const OfferingNotFoundException();
     }
 
     return offering.availablePackages
@@ -35,7 +39,7 @@ class SubscriptionRepositoryImpl implements SubscriptionRepository {
     final offering = offerings.current ?? offerings.all['default'];
 
     if (offering == null) {
-      throw Exception('Default offering not found');
+      throw const OfferingNotFoundException();
     }
 
     final package = offering.availablePackages
@@ -43,16 +47,32 @@ class SubscriptionRepositoryImpl implements SubscriptionRepository {
         .firstOrNull;
 
     if (package == null) {
-      throw Exception('Subscription plan not found: $planId');
+      throw PlanNotFoundException(planId);
     }
 
-    final customerInfo = await remoteDataSource.purchasePackage(package);
-    return SubscriptionMapper.toSubscriptionEntity(customerInfo);
+    try {
+      final customerInfo = await remoteDataSource.purchasePackage(package);
+      return SubscriptionMapper.toSubscriptionEntity(customerInfo);
+    } on PlatformException catch (e) {
+      final errorCode = PurchasesErrorHelper.getErrorCode(e);
+
+      if (errorCode == PurchasesErrorCode.purchaseCancelledError) {
+        throw const PurchaseCancelledException();
+      }
+
+      throw PurchaseFailedException(e.message ?? 'Purchase failed.');
+    }
   }
 
   @override
   Future<SubscriptionEntity> restorePurchases() async {
-    final customerInfo = await remoteDataSource.restorePurchases();
-    return SubscriptionMapper.toSubscriptionEntity(customerInfo);
+    try {
+      final customerInfo = await remoteDataSource.restorePurchases();
+      return SubscriptionMapper.toSubscriptionEntity(customerInfo);
+    } on PlatformException catch (e) {
+      throw RestoreFailedException(
+        e.message ?? 'Restore purchases failed.',
+      );
+    }
   }
 }

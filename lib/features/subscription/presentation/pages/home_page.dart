@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../providers/subscription_providers.dart';
+import 'paywall_page.dart';
 
 class HomePage extends ConsumerWidget {
   const HomePage({super.key});
@@ -173,7 +174,11 @@ class HomePage extends ConsumerWidget {
                   const Spacer(),
                   FilledButton(
                     onPressed: () {
-                      // Paywall navigation comes next
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const PaywallPage(),
+                        ),
+                      );
                     },
                     style: FilledButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 16),

@@ -3,11 +3,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/datasources/subscription_remote_datasource.dart';
 import '../../data/datasources/subscription_remote_datasource_impl.dart';
 import '../../data/repositories/subscription_repository_impl.dart';
+import '../../domain/entities/subscription_entity.dart';
+import '../../domain/entities/subscription_plan_entity.dart';
 import '../../domain/repositories/subscription_repository.dart';
 import '../../domain/usecases/get_available_plans_usecase.dart';
 import '../../domain/usecases/get_current_subscription_usecase.dart';
 import '../../domain/usecases/purchase_plan_usecase.dart';
 import '../../domain/usecases/restore_purchases_usecase.dart';
+import '../notifiers/plans_notifier.dart';
+import '../notifiers/subscription_action_notifier.dart';
+import '../notifiers/subscription_notifier.dart';
+import '../states/subscription_action_state.dart';
 
 final subscriptionRemoteDataSourceProvider =
     Provider<SubscriptionRemoteDataSource>((ref) {
@@ -48,3 +54,18 @@ final restorePurchasesUseCaseProvider =
     ref.watch(subscriptionRepositoryProvider),
   );
 });
+
+final subscriptionNotifierProvider =
+    AsyncNotifierProvider<SubscriptionNotifier, SubscriptionEntity>(
+  SubscriptionNotifier.new,
+);
+
+final plansNotifierProvider =
+    AsyncNotifierProvider<PlansNotifier, List<SubscriptionPlanEntity>>(
+  PlansNotifier.new,
+);
+
+final subscriptionActionNotifierProvider =
+    NotifierProvider<SubscriptionActionNotifier, SubscriptionActionState>(
+  SubscriptionActionNotifier.new,
+);

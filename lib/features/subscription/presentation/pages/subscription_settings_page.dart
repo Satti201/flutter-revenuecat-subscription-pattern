@@ -2,33 +2,33 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../providers/subscription_providers.dart';
-import 'paywall_page.dart';
-import 'subscription_settings_page.dart';
 
-class HomePage extends ConsumerWidget {
-  const HomePage({super.key});
+class SubscriptionSettingsPage extends ConsumerWidget {
+  const SubscriptionSettingsPage({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final subscriptionAsync = ref.watch(subscriptionNotifierProvider);
+    final actionState = ref.watch(subscriptionActionNotifierProvider);
+
+    ref.listen(subscriptionActionNotifierProvider, (previous, next) {
+      if (next.errorMessage != null &&
+          next.errorMessage != previous?.errorMessage) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(next.errorMessage!),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        ref.read(subscriptionActionNotifierProvider.notifier).clearError();
+      }
+    });
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('PremiumFlow'),
+        title: const Text('Subscription'),
         centerTitle: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.settings_outlined),
-            tooltip: 'Subscription Settings',
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => const SubscriptionSettingsPage(),
-                ),
-              );
-            },
-          ),
-        ],
       ),
       body: subscriptionAsync.when(
         loading: () => const Center(
@@ -98,7 +98,7 @@ class HomePage extends ConsumerWidget {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Text(
-                                'Current Plan',
+                                'Subscription Status',
                                 style: Theme.of(context)
                                     .textTheme
                                     .labelLarge
@@ -133,7 +133,7 @@ class HomePage extends ConsumerWidget {
                           ),
                           const SizedBox(height: 12),
                           Text(
-                            isPremium ? 'Premium Active' : 'Free Tier',
+                            isPremium ? 'Active Premium' : 'Free Access',
                             style: Theme.of(context)
                                 .textTheme
                                 .headlineSmall
@@ -170,7 +170,7 @@ class HomePage extends ConsumerWidget {
                             ],
                           ] else ...[
                             Text(
-                              'Upgrade to unlock all premium features and unrestricted access.',
+                              'You currently do not have an active subscription on this account.',
                               style: Theme.of(context)
                                   .textTheme
                                   .bodyMedium
@@ -187,27 +187,53 @@ class HomePage extends ConsumerWidget {
                   ),
                   const Spacer(),
                   FilledButton(
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => isPremium
-                              ? const SubscriptionSettingsPage()
-                              : const PaywallPage(),
-                        ),
-                      );
-                    },
+                    onPressed: actionState.isRestoring
+                        ? null
+                        : () async {
+                            final success = await ref
+                                .read(subscriptionActionNotifierProvider.notifier)
+                                .restorePurchases();
+
+                            if (!context.mounted) return;
+
+                            if (success) {
+                              final updatedSubscription = ref
+                                  .read(subscriptionNotifierProvider)
+                                  .value;
+                              final restoredPremium =
+                                  updatedSubscription?.isPremium == true;
+
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    restoredPremium
+                                        ? 'Premium subscription restored.'
+                                        : 'Restore completed, but no active subscription was found.',
+                                  ),
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                            }
+                          },
                     style: FilledButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    child: Text(
-                      isPremium
-                          ? 'View Subscription Details'
-                          : 'Upgrade to Premium',
-                      style: const TextStyle(fontSize: 16),
-                    ),
+                    child: actionState.isRestoring
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Text(
+                            'Restore Purchases',
+                            style: TextStyle(fontSize: 16),
+                          ),
                   ),
                   const SizedBox(height: 12),
                   OutlinedButton.icon(

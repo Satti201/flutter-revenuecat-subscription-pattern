@@ -4,9 +4,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:premium_flow/features/subscription/domain/entities/subscription_entity.dart';
 import 'package:premium_flow/features/subscription/domain/entities/subscription_plan_entity.dart';
 import 'package:premium_flow/features/subscription/presentation/notifiers/plans_notifier.dart';
+import 'package:premium_flow/features/subscription/presentation/notifiers/subscription_action_notifier.dart';
 import 'package:premium_flow/features/subscription/presentation/notifiers/subscription_notifier.dart';
 import 'package:premium_flow/features/subscription/presentation/pages/home_page.dart';
 import 'package:premium_flow/features/subscription/presentation/pages/paywall_page.dart';
+import 'package:premium_flow/features/subscription/presentation/pages/subscription_settings_page.dart';
 import 'package:premium_flow/features/subscription/presentation/providers/subscription_providers.dart';
 
 void main() {
@@ -32,6 +34,7 @@ void main() {
     expect(find.text('Free Tier'), findsOneWidget);
     expect(find.text('Upgrade to Premium'), findsOneWidget);
     expect(find.text('Refresh Status'), findsOneWidget);
+    expect(find.byIcon(Icons.settings_outlined), findsOneWidget);
   });
 
   testWidgets('HomePage displays PREMIUM details when subscription is active',
@@ -67,7 +70,7 @@ void main() {
     expect(find.text('View Subscription Details'), findsOneWidget);
   });
 
-  testWidgets('HomePage navigates to PaywallPage and displays plans',
+  testWidgets('HomePage navigates to PaywallPage for free user CTA',
       (WidgetTester tester) async {
     final samplePlans = [
       const SubscriptionPlanEntity(
@@ -118,6 +121,97 @@ void main() {
     expect(find.text('BEST VALUE'), findsOneWidget);
     expect(find.text('Subscribe Now'), findsOneWidget);
   });
+
+  testWidgets(
+      'HomePage navigates to SubscriptionSettingsPage via AppBar settings icon for Free user',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          subscriptionNotifierProvider.overrideWith(
+            () => _FakeSubscriptionNotifier(const SubscriptionEntity.free()),
+          ),
+          subscriptionActionNotifierProvider.overrideWith(
+            () => _FakeSubscriptionActionNotifier(restoreSuccess: true),
+          ),
+        ],
+        child: const MaterialApp(
+          home: HomePage(),
+        ),
+      ),
+    );
+
+    await tester.pump();
+
+    // Tap settings icon in AppBar
+    await tester.tap(find.byIcon(Icons.settings_outlined));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(SubscriptionSettingsPage), findsOneWidget);
+    expect(find.text('Subscription Status'), findsOneWidget);
+    expect(find.text('FREE'), findsOneWidget);
+    expect(find.text('Free Access'), findsOneWidget);
+    expect(find.text('Restore Purchases'), findsOneWidget);
+
+    // Tap 'Restore Purchases'
+    await tester.tap(find.text('Restore Purchases'));
+    await tester.pumpAndSettle();
+
+    // Feedback indicates no active subscription found since user remains Free
+    expect(
+      find.text('Restore completed, but no active subscription was found.'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets(
+      'HomePage navigates to SubscriptionSettingsPage via CTA for Premium user and handles Restore',
+      (WidgetTester tester) async {
+    final premiumSubscription = SubscriptionEntity(
+      status: SubscriptionStatus.premium,
+      entitlementId: 'premium',
+      expiresAt: DateTime(2027, 6, 15),
+      willRenew: true,
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          subscriptionNotifierProvider.overrideWith(
+            () => _FakeSubscriptionNotifier(premiumSubscription),
+          ),
+          subscriptionActionNotifierProvider.overrideWith(
+            () => _FakeSubscriptionActionNotifier(restoreSuccess: true),
+          ),
+        ],
+        child: const MaterialApp(
+          home: HomePage(),
+        ),
+      ),
+    );
+
+    await tester.pump();
+
+    // Tap 'View Subscription Details'
+    await tester.tap(find.text('View Subscription Details'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(SubscriptionSettingsPage), findsOneWidget);
+    expect(find.text('Subscription Status'), findsOneWidget);
+    expect(find.text('PREMIUM'), findsOneWidget);
+    expect(find.text('Active Premium'), findsOneWidget);
+    expect(find.text('Entitlement'), findsOneWidget);
+    expect(find.text('premium'), findsOneWidget);
+    expect(find.text('Auto-renews'), findsOneWidget);
+    expect(find.text('Yes'), findsOneWidget);
+    expect(find.text('Expires'), findsOneWidget);
+
+    // Tap 'Restore Purchases'
+    await tester.tap(find.text('Restore Purchases'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Premium subscription restored.'), findsOneWidget);
+  });
 }
 
 class _FakeSubscriptionNotifier extends SubscriptionNotifier {
@@ -139,5 +233,17 @@ class _FakePlansNotifier extends PlansNotifier {
   @override
   Future<List<SubscriptionPlanEntity>> build() async {
     return _plans;
+  }
+}
+
+class _FakeSubscriptionActionNotifier extends SubscriptionActionNotifier {
+  final bool _restoreSuccess;
+
+  _FakeSubscriptionActionNotifier({bool restoreSuccess = true})
+      : _restoreSuccess = restoreSuccess;
+
+  @override
+  Future<bool> restorePurchases() async {
+    return _restoreSuccess;
   }
 }

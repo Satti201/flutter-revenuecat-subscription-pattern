@@ -70,7 +70,12 @@ class SubscriptionRepositoryImpl implements SubscriptionRepository {
     } on SubscriptionException {
       rethrow;
     } on PlatformException catch (e) {
-      final errorCode = PurchasesErrorHelper.getErrorCode(e);
+      PurchasesErrorCode? errorCode;
+      try {
+        errorCode = PurchasesErrorHelper.getErrorCode(e);
+      } catch (_) {
+        errorCode = null;
+      }
 
       if (errorCode == PurchasesErrorCode.purchaseCancelledError) {
         throw const PurchaseCancelledException();

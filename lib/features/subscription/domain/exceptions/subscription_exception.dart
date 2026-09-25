@@ -13,7 +13,9 @@ class OfferingNotFoundException extends SubscriptionException {
 }
 
 class PlanNotFoundException extends SubscriptionException {
-  const PlanNotFoundException(String planId)
+  final String planId;
+
+  const PlanNotFoundException(this.planId)
       : super('Subscription plan not found: $planId');
 }
 

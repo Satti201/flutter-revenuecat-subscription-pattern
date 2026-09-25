@@ -1,19 +1,19 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:premium_flow/features/subscription/data/listeners/customer_info_listener.dart';
+import 'package:premium_flow/features/subscription/data/listeners/subscription_updates_listener.dart';
 import 'package:premium_flow/features/subscription/domain/entities/subscription_entity.dart';
 import 'package:premium_flow/features/subscription/presentation/notifiers/subscription_notifier.dart';
 import 'package:premium_flow/features/subscription/presentation/providers/subscription_providers.dart';
-import 'package:purchases_flutter/purchases_flutter.dart';
 
 void main() {
-  test('subscriptionCustomerInfoSyncProvider updates subscription state on CustomerInfo update',
+  test(
+      'subscriptionCustomerInfoSyncProvider updates subscription state when listener emits SubscriptionEntity',
       () async {
-    final fakeListener = _FakeCustomerInfoListener();
+    final fakeListener = _FakeSubscriptionUpdatesListener();
 
     final container = ProviderContainer(
       overrides: [
-        customerInfoListenerProvider.overrideWithValue(fakeListener),
+        subscriptionUpdatesListenerProvider.overrideWithValue(fakeListener),
         subscriptionNotifierProvider.overrideWith(
           () => _FakeSubscriptionNotifier(const SubscriptionEntity.free()),
         ),
@@ -28,55 +28,15 @@ void main() {
     container.read(subscriptionCustomerInfoSyncProvider);
     expect(fakeListener.listeners.length, equals(1));
 
-    // Simulate RevenueCat emitting CustomerInfo with active premium entitlement
-    final premiumCustomerInfo = CustomerInfo.fromJson(const {
-      'entitlements': {
-        'all': {
-          'premium': {
-            'identifier': 'premium',
-            'isActive': true,
-            'willRenew': true,
-            'periodType': 'normal',
-            'latestPurchaseDate': '2026-09-01T00:00:00Z',
-            'originalPurchaseDate': '2026-09-01T00:00:00Z',
-            'expirationDate': '2027-09-01T00:00:00Z',
-            'store': 'app_store',
-            'productIdentifier': 'premium_monthly',
-            'isSandbox': true,
-            'unsubscribeDetectedAt': null,
-            'billingIssueDetectedAt': null,
-          }
-        },
-        'active': {
-          'premium': {
-            'identifier': 'premium',
-            'isActive': true,
-            'willRenew': true,
-            'periodType': 'normal',
-            'latestPurchaseDate': '2026-09-01T00:00:00Z',
-            'originalPurchaseDate': '2026-09-01T00:00:00Z',
-            'expirationDate': '2027-09-01T00:00:00Z',
-            'store': 'app_store',
-            'productIdentifier': 'premium_monthly',
-            'isSandbox': true,
-            'unsubscribeDetectedAt': null,
-            'billingIssueDetectedAt': null,
-          }
-        },
-      },
-      'activeSubscriptions': ['premium_monthly'],
-      'allPurchasedProductIdentifiers': ['premium_monthly'],
-      'nonSubscriptionTransactions': [],
-      'firstSeen': '2026-01-01T00:00:00Z',
-      'originalAppUserId': 'test_user',
-      'requestDate': '2026-09-25T00:00:00Z',
-      'originalApplicationVersion': '1.0',
-      'allExpirationDates': {'premium_monthly': '2027-09-01T00:00:00Z'},
-      'allPurchaseDates': {'premium_monthly': '2026-09-01T00:00:00Z'},
-      'managementURL': null,
-    });
+    // Simulate listener emitting updated domain SubscriptionEntity
+    final premiumSubscription = SubscriptionEntity(
+      status: SubscriptionStatus.premium,
+      entitlementId: 'premium',
+      expiresAt: DateTime(2027, 9, 1),
+      willRenew: true,
+    );
 
-    fakeListener.emit(premiumCustomerInfo);
+    fakeListener.emit(premiumSubscription);
 
     final updated = container.read(subscriptionNotifierProvider).value;
     expect(updated?.status, equals(SubscriptionStatus.premium));
@@ -89,22 +49,22 @@ void main() {
   });
 }
 
-class _FakeCustomerInfoListener implements CustomerInfoListener {
-  final List<void Function(CustomerInfo)> listeners = [];
+class _FakeSubscriptionUpdatesListener implements SubscriptionUpdatesListener {
+  final List<void Function(SubscriptionEntity)> listeners = [];
 
   @override
-  void add(void Function(CustomerInfo customerInfo) listener) {
+  void add(void Function(SubscriptionEntity subscription) listener) {
     listeners.add(listener);
   }
 
   @override
-  void remove(void Function(CustomerInfo customerInfo) listener) {
+  void remove(void Function(SubscriptionEntity subscription) listener) {
     listeners.remove(listener);
   }
 
-  void emit(CustomerInfo customerInfo) {
+  void emit(SubscriptionEntity subscription) {
     for (final listener in List.of(listeners)) {
-      listener(customerInfo);
+      listener(subscription);
     }
   }
 }

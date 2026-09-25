@@ -5,7 +5,7 @@
 [![Flutter CI](https://github.com/Satti201/flutter-revenuecat-subscription-pattern/actions/workflows/flutter_ci.yml/badge.svg)](https://github.com/Satti201/flutter-revenuecat-subscription-pattern/actions/workflows/flutter_ci.yml)
 [![Tests](https://img.shields.io/badge/tests-51%20passed-brightgreen.svg)](https://github.com/Satti201/flutter-revenuecat-subscription-pattern/actions)
 [![Flutter](https://img.shields.io/badge/Flutter-3.x-02569B?logo=flutter)](https://flutter.dev)
-[![Riverpod](https://img.shields.io/badge/State-Riverpod%202.x-0175C2)](https://riverpod.dev)
+[![Riverpod](https://img.shields.io/badge/State-Riverpod%203.x-0175C2)](https://riverpod.dev)
 [![RevenueCat](https://img.shields.io/badge/In--App%20Purchases-RevenueCat%20v10-f2545b)](https://www.revenuecat.com)
 [![Architecture](https://img.shields.io/badge/Architecture-Clean%20Architecture-blueviolet)](#architecture)
 
@@ -21,7 +21,7 @@
 - **Domain Isolation from SDK Types**: Zero RevenueCat SDK models (`CustomerInfo`, `Package`, `Offering`, `PlatformException`) leak beyond the data layer.
 - **Typed Domain Exceptions**: All platform and billing channel exceptions are mapped to domain-specific error types.
 - **Concurrency & Duplicate Action Protection**: State-level guards prevent duplicate billing requests while transactions are already in flight.
-- **Zero Hardcoded Secrets**: Secure environment-based API key injection through `--dart-define`.
+- **Environment-Based SDK Configuration**: The RevenueCat SDK key is supplied through `--dart-define` rather than hardcoded in the source repository.
 - **51 Automated Tests & GitHub Actions CI**: Complete automated test suite covering configuration, mappers, repositories, stream listeners, notifiers, and UI widgets running in GitHub Actions.
 
 ---
@@ -41,25 +41,25 @@ This project enforces strict Clean Architecture boundaries:
 
 ```mermaid
 flowchart TD
-    UI[Flutter UI Pages & Widgets]
-    RIVERPOD[Riverpod Providers & Notifiers]
+    UI[Flutter UI]
+    STATE[Riverpod Providers & Notifiers]
     USECASES[Domain Use Cases]
-    REPO[Subscription Repository Interface]
-    REPOIMPL[Subscription Repository Implementation]
+    CONTRACT[SubscriptionRepository - Domain Contract]
+    IMPL[SubscriptionRepositoryImpl - Data Layer]
     DATASOURCE[RevenueCat Remote Data Source]
-    SDK[RevenueCat SDK - purchases_flutter]
+    SDK[RevenueCat SDK]
 
-    UI --> RIVERPOD
-    RIVERPOD --> USECASES
-    USECASES --> REPO
-    REPOIMPL -.->|implements| REPO
-    REPOIMPL --> DATASOURCE
+    UI --> STATE
+    STATE --> USECASES
+    USECASES --> CONTRACT
+    CONTRACT -. implemented by .-> IMPL
+    IMPL --> DATASOURCE
     DATASOURCE --> SDK
 ```
 
 ### Live CustomerInfo Synchronization Flow
 
-RevenueCat can emit customer updates outside the normal user actions (e.g. renewal events, web purchases, or background refresh). Rather than leaking SDK types into the presentation layer, updates flow through an isolated adapter pipeline:
+RevenueCat can emit CustomerInfo updates outside the app's immediate purchase and restore actions. Rather than leaking SDK types into the presentation layer, those updates pass through an isolated adapter pipeline:
 
 ```mermaid
 flowchart TD
@@ -138,7 +138,7 @@ Settings displays:
 ## Getting Started
 
 ### 1. Prerequisites
-- [Flutter SDK](https://docs.flutter.dev/get-started/install) (version 3.19 or higher)
+- [Flutter SDK](https://docs.flutter.dev/get-started/install) 3.x (latest stable recommended)
 - Android Studio / VS Code with Flutter extension
 - A free [RevenueCat account](https://app.revenuecat.com)
 
@@ -190,7 +190,7 @@ flutter run --dart-define=REVENUECAT_API_KEY=test_yourTestStoreApiKeyHere
 flutter build apk --dart-define=REVENUECAT_API_KEY=test_yourTestStoreApiKeyHere
 ```
 
-> **Security Note**: The SDK key is **never hardcoded in source control**. The app includes a startup assertion (`RevenueCatConfig.apiKey`) that raises a descriptive `StateError` if the key was omitted during build.
+> **Configuration Note**: The SDK key is **never hardcoded in source control**. The app includes a startup assertion (`RevenueCatConfig.apiKey`) that raises a descriptive `StateError` if the key was omitted during build.
 
 ---
 
@@ -202,9 +202,9 @@ The codebase includes **51 automated tests** covering every layer of the archite
 |:---|:---|:---:|:---|
 | **Configuration** | `test/core/config/revenuecat_config_test.dart` | 1 | Ensures API key validation and helpful error messaging. |
 | **Data Mappers** | `test/features/subscription/data/mappers/subscription_mapper_test.dart` | 5 | SDK `CustomerInfo` and `Package` mapping into pure domain entities. |
-| **Repository** | `test/features/subscription/data/repositories/subscription_repository_impl_test.dart` | 12 | SDK error translation, user cancellations, and entity mapping. |
+| **Repository** | `test/features/subscription/data/repositories/subscription_repository_impl_test.dart` | 13 | SDK error translation, user cancellations, and entity mapping. |
 | **Live Sync** | `test/features/subscription/presentation/providers/subscription_customer_info_sync_test.dart` | 1 | Proves listener events update presentation state. |
-| **Notifiers** | `test/features/subscription/presentation/notifiers/*` | 18 | `SubscriptionNotifier`, `PlansNotifier`, and `SubscriptionActionNotifier` guards. |
+| **Notifiers** | `test/features/subscription/presentation/notifiers/*` | 17 | `SubscriptionNotifier`, `PlansNotifier`, and `SubscriptionActionNotifier` state and concurrency guards. |
 | **Widget UI** | `test/widget_test.dart` | 14 | Paywall interactions, plan switching, loading states, error SnackBars, and navigation. |
 
 ### Run Analyzer & Tests
@@ -282,10 +282,10 @@ lib/
 
 1. **SDK Type Encapsulation**: Neither `CustomerInfo` nor `Package` is ever exposed to the Presentation layer. The entire UI consumes only domain-pure `SubscriptionEntity` and `SubscriptionPlanEntity`.
 2. **Separation of Persistent vs. Transient State**:
-   - `subscriptionNotifierProvider`: Holds the current subscription status (cached & synced).
+   - `subscriptionNotifierProvider`: Holds the current in-memory subscription state and receives live updates.
    - `plansNotifierProvider`: Holds available subscription packages.
    - `subscriptionActionNotifierProvider`: Owns transient action state (`isPurchasing`, `isRestoring`, `errorMessage`).
-3. **Dedicated Settings Screen for Restore**: Apple App Store Guidelines and Google Play policies require accessible restore functionality. Placing restore in dedicated Subscription Settings makes it accessible to both free and premium users without cluttering the paywall.
+3. **Dedicated Settings Screen for Restore**: Restore functionality is accessible to both free and premium users. This is important because a returning customer may initially appear as free before their previous purchases are restored.
 
 ---
 

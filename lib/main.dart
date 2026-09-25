@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/services/revenuecat_service.dart';
 import 'features/subscription/presentation/pages/home_page.dart';
+import 'features/subscription/presentation/providers/subscription_providers.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -16,11 +17,13 @@ Future<void> main() async {
   );
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends ConsumerWidget {
   const MyApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    ref.watch(subscriptionCustomerInfoSyncProvider);
+
     return MaterialApp(
       title: 'PremiumFlow',
       debugShowCheckedModeBanner: false,

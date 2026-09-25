@@ -1,7 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:purchases_flutter/purchases_flutter.dart';
 
 import '../../data/datasources/subscription_remote_datasource.dart';
 import '../../data/datasources/subscription_remote_datasource_impl.dart';
+import '../../data/listeners/customer_info_listener.dart';
+import '../../data/listeners/revenuecat_customer_info_listener.dart';
+import '../../data/mappers/subscription_mapper.dart';
 import '../../data/repositories/subscription_repository_impl.dart';
 import '../../domain/entities/subscription_entity.dart';
 import '../../domain/entities/subscription_plan_entity.dart';
@@ -69,3 +73,27 @@ final subscriptionActionNotifierProvider =
     NotifierProvider<SubscriptionActionNotifier, SubscriptionActionState>(
   SubscriptionActionNotifier.new,
 );
+
+final customerInfoListenerProvider =
+    Provider<CustomerInfoListener>((ref) {
+  return const RevenueCatCustomerInfoListener();
+});
+
+final subscriptionCustomerInfoSyncProvider = Provider<void>((ref) {
+  final listenerService = ref.watch(customerInfoListenerProvider);
+
+  void onCustomerInfoUpdated(CustomerInfo customerInfo) {
+    final subscription =
+        SubscriptionMapper.toSubscriptionEntity(customerInfo);
+
+    ref
+        .read(subscriptionNotifierProvider.notifier)
+        .setSubscription(subscription);
+  }
+
+  listenerService.add(onCustomerInfoUpdated);
+
+  ref.onDispose(() {
+    listenerService.remove(onCustomerInfoUpdated);
+  });
+});
